@@ -1,6 +1,6 @@
 (function evoTSPwrapper($) {
   const baseUrl =
-    "https://6jj80mdfp2.execute-api.us-east-1.amazonaws.com/prod";
+    "https://pt8bpw7d6b.execute-api.us-east-1.amazonaws.com/prod";
 
   /*
    * This is organized into sections:
@@ -278,10 +278,8 @@
   // ensure that the best routes that you get from the HTTP call will
   // be passed along in the `runGeneration` waterfall. 
   function getBestRoutes(generation, callback) {
-
     const runId = $('#runId-text-field').val();
     const numToReturn = $('#num-parents').val();
-
     const url = baseUrl + `/best?runId=${runId}&generation=${generation}&numToReturn=${numToReturn}`;
 
     $.ajax({
@@ -412,22 +410,22 @@
       $("#best-route-cities").append(`<li>${cityName}</li>`);
     });
   }
-
+  
   // Display all the children. This just uses a `forEach`
   // to call `displayRoute` on each child route.
   function displayChildren(children, dc_cb) {
+    $('#new-route-list').text('');
     children.forEach(child => displayRoute(child));
     dc_cb(null, children);
   }
 
   // Display a new (child) route (ID and length)
   function displayRoute(result) {
-    $('#new-route-list').text('');
 
     console.log(result);
     let routeId = result.routeId;
     let length = result.len;
-    $('#new-route-list');
+    $('#new-route-list').append(`<li>Route generated:${routeId} with length: ${length}.</li>`);
   }
 
   // Display the best routes (length and IDs)
@@ -439,6 +437,7 @@
   // so the array of best routes is pass along through
   // the waterfall in `runGeneration`.
   function displayBestRoutes(bestRoutes, dbp_cb) {
+    console.log("best routes:" + JSON.stringify(bestRoutes));
     $("#best-route-list").append(`<li>routeId: ${bestRoutes[0].routeId} with length: ${bestRoutes[0].len}</li>`);
 
     dbp_cb(null, bestRoutes)
