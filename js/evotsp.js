@@ -1,6 +1,6 @@
 (function evoTSPwrapper($) {
   const baseUrl =
-    "https://nh5gsos957.execute-api.us-east-1.amazonaws.com/prod/";
+    "https://6jj80mdfp2.execute-api.us-east-1.amazonaws.com/prod";
 
   /*
    * This is organized into sections:
@@ -11,14 +11,6 @@
    *  - The functions that update the HTML over time
    *  - The functions that keep track of the best route
    *  - The functions that initialize the map and plot the best route
-   * 
-   * _Most_ of this is complete. You have to:
-   * 
-   *  - Fill in all the Ajax/HTTP calls
-   *  - Finish up some of the HTML update functions
-   * 
-   * We gave you all the evolution stuff and the mapping code, although what we gave
-   * you is pretty crude and you should feel free to fancy it up.
    */
 
   // Will be populated by `populateCityData`
@@ -42,14 +34,10 @@
   };
 
   ////////////////////////////////////////////////////////////
-  // BEGIN OF RUN EVOLUTION //////////////////////////////////
+  // BEGINNING OF RUN EVOLUTION //////////////////////////////////
   ////////////////////////////////////////////////////////////
 
-  // This runs the evolutionary process. This function and it's
-  // helper functions are all complete and you shouldn't have to
-  // change anything here. Some of these functions do call functions
-  // "outside" this, some of which you'll need to write. In particular
-  // you'll need to implement `randomRoute()` below in this section.
+  // This runs the evolutionary process.
   function runEvolution() {
     // Generate a new runId and set the current generation to 0
     const runId = generateUID(16);
@@ -67,7 +55,7 @@
     // (sometimes only) argument. That needs to be either passed in to a
     // nested async tool (like `asyn.timesSeries` below) or called after
     // the other work is done (like the `cb()` call in the last function).
-    async.series([  
+    async.series([
       initializePopulation, // create the initial population
       runAllGenerations,    // Run the specified number of generations
       showAllDoneAlert,     // Show an "All done" alert.
@@ -80,12 +68,12 @@
       );
       $("#new-route-list").text("");
       async.times(
-        populationSize, 
+        populationSize,
         (counter, rr_cb) => randomRoute(runId, initialGeneration, rr_cb),
         cb
       );
     }
-    
+
     function runAllGenerations(cb) {
       // get # of generations
       const numGenerations = parseInt($("#num-generations").val());
@@ -116,28 +104,31 @@
         )
         .replace(/[+/]/g, "")
         .substring(0, length);
-    }  
+    }
   }
 
   function randomRoute(runId, generation, cb) {
-    AWSAjax(
-      {
+
+    $.ajax({
+      method: 'POST',
+      url: baseUrl + '/routes',
+      data: JSON.stringify({
         runId: runId,
-        generation: generation,
-        lengthStoreThreshold: lengthStoreThreshold,
-      },
-      "/routes",
-      displayRoute,
-      ["generating random route", "when creating a random route"]
-    )
-    // If the Ajax call succeeds, return the newly generated route.
-    .done((newRoute) => { cb(null, newRoute); })
-    // If the Ajax call fails, print a message and pass the error up through
-    // the callback function `cb`.
-    .fail((jqHXR, textStatus, err) => {
-      console.error("Problem with randomRoute AJAX call: " + textStatus);
-      cb(err);
-    });
+        generation: generation
+      }),
+      contentType: 'application/json',
+
+      success: (aRoute) => cb(null, aRoute),
+      error: function ajaxError(jqXHR, textStatus, errorThrown) {
+        console.error(
+          'Error generating random route: ',
+          textStatus,
+          ', Details: ',
+          errorThrown);
+        console.error('Response: ', jqXHR.responseText);
+        alert('An error occurred when creating a random route:\n' + jqXHR.responseText);
+      }
+    })
   }
 
   ////////////////////////////////////////////////////////////
@@ -150,9 +141,7 @@
 
   // This runs a single generation, getting the best routes from the
   // specified generation, and using them to make a population of
-  // new routes for the next generation via mutation. This is all
-  // complete and you shouldn't need to change anything here. It
-  // does, however, call things that you need to complete.
+  // new routes for the next generation via mutation.
   function runGeneration(generation, cb) {
     const popSize = parseInt($("#population-size-text-field").val());
     console.log(`Running generation ${generation}`);
@@ -233,7 +222,7 @@
     // number of children will be (roughly) the same as the requested
     // population size. If, for example, the population size is 100 and
     // the number of parents is 20, then `numChildren` will be 5.
-    function generateChildren (parents, genChildren_cb) {
+    function generateChildren(parents, genChildren_cb) {
       const numChildren = Math.floor(popSize / parents.length);
       // `async.each` runs the provided function once (in "parallel") for
       // each of the values in the array of parents.
@@ -276,17 +265,10 @@
   ////////////////////////////////////////////////////////////
 
   // These are the various functions that will make Ajax HTTP
-  // calls to your various Lambdas. Some of these are *very* similar
-  // to things you've already done in the previous project.
+  // calls to your various Lambdas.
 
   // This should get the best routes in the specified generation,
-  // which will be used (elsewhere) as parents. You should be able
-  // to use the (updated) Lambda from the previous exercise and call
-  // it in essentially the same way as you did before.
-  //
-  // You'll need to use the value of the `num-parents` field to
-  // indicate how many routes to return. You'll also need to use
-  // the `runId-text-field` field to get the `runId`.
+  // which will be used (elsewhere) as parents. 
   //
   // MAKE SURE YOU USE 
   //
@@ -296,16 +278,35 @@
   // ensure that the best routes that you get from the HTTP call will
   // be passed along in the `runGeneration` waterfall. 
   function getBestRoutes(generation, callback) {
-    // FILL THIS IN
+
+    const runId = $('#runId-text-field').val();
+    const numToReturn = $('#num-parents').val();
+
+    const url = baseUrl + `/best?runId=${runId}&generation=${generation}&numToReturn=${numToReturn}`;
+
+    $.ajax({
+      method: 'GET',
+      url: url,
+      contentType: 'application/json',
+
+      success: (bestRoutes) => callback(null, bestRoutes),
+      error: function ajaxError(jqXHR, textStatus, errorThrown) {
+        console.error(
+          'Error when getting the best routes: ',
+          textStatus,
+          ', Details: ',
+          errorThrown
+        );
+        console.error('Response: ', jqXHR.responseText);
+        alert('An error occurred when getting the details for the routes: \n' + jqXHR.responseText);
+      }
+    })
   }
 
   // Create the specified number of children by mutating the given
   // parent that many times. Each child should have their generation
   // set to ONE MORE THAN THE GIVEN GENERATION. This is crucial, or
   // every route will end up in the same generation.
-  //
-  // This will use one of the new Lambdas that you wrote for the final
-  // project.
   //
   // MAKE SURE YOU USE
   //
@@ -314,21 +315,83 @@
   // as the `success` callback function in your Ajax call to make sure
   // the children pass down through the `runGeneration` waterfall.
   function makeChildren(parent, numChildren, generation, cb) {
-    // FILL THIS IN
+
+    $.ajax({
+      method: 'POST',
+      url: baseUrl + '/mutateroute',
+      data: JSON.stringify({
+        routeId: parent.routeId,
+        lengthStoreThreshold: lengthStoreThreshold,
+        numChildren: numChildren
+      }),
+
+      contentType: 'application/json',
+
+      success: (children) => cb(null, children),
+      error: function ajaxError(jqXHR, textStatus, errorThrown) {
+
+        console.error(
+          'Error when making the children: ',
+          textStatus,
+          ', Details: ',
+          errorThrown
+        );
+        console.error('Response: ', jqXHR.responseText);
+        alert('An error occurred when making the children \n' + jqXHR.responseText);
+      }
+    })
   }
 
   // Get the full details of the specified route. You should largely
   // have this done from the previous exercise. Make sure you pass
   // `callback` as the `success` callback function in the Ajax call.
   function getRouteById(routeId, callback) {
-    // FILL THIS IN
+    const url = baseUrl + '/routes/' + routeId;
+
+    $.ajax({
+      method: 'GET',
+      url: url,
+      contentType: 'application/json',
+
+      success: (route) => callback(route),
+
+      error: function ajaxError(jqXHR, textStatus, errorThrown) {
+        console.error(
+          'Error getting the details of the route by ID',
+          textStatus,
+          ', Details: ',
+          errorThrown
+        );
+        console.error('Response: ', jqXHR.responseText);
+        alert('An error occurred when getting the details for the route: \n' + jqXHR.responseText);
+      }
+    })
   }
 
   // Get city data (names, locations, etc.) from your new Lambda that returns
   // that information. Make sure you pass `callback` as the `success` callback
   // function in the Ajax call.
   function fetchCityData(callback) {
-    // FILL THIS IN
+
+    $.ajax(
+      {
+        method: 'GET',
+        url: baseUrl + '/city-data',
+        contentType: 'application/json',
+
+        success: (cityData) => callback(cityData),
+
+        error: function ajaxError(jqXHR, textStatus, errorThrown) {
+          console.error(
+            'Error getting city data',
+            textStatus,
+            ', Details: ',
+            errorThrown
+          );
+          console.error('Response: ', jqXHR.responseText);
+          alert('An error occurred when getting the city data: \n' + jqXHR.responseText);
+        }
+      })
   }
 
   ////////////////////////////////////////////////////////////
@@ -336,19 +399,9 @@
   ////////////////////////////////////////////////////////////
 
   // The next few functions handle displaying different values
-  // in the HTML of the web app. This is all complete and you
-  // shouldn't have to do anything here, although you're welcome
-  // to modify parts of this if you want to change the way
-  // things look.
+  // in the HTML of the web app.
 
-  // A few of them are complete as is (`displayBestPath()` and
-  // `displayChildren()`), while others need to be written:
-  // 
-  // - `displayRoute()`
-  // - `displayBestRoutes()`
-
-  // Display the details of the best path. This is complete,
-  // but you can fancy it up if you wish.
+  // Display the details of the best path.
   function displayBestPath() {
     $("#best-length").text(best.len);
     $("#best-path").text(JSON.stringify(best.bestPath));
@@ -361,23 +414,23 @@
   }
 
   // Display all the children. This just uses a `forEach`
-  // to call `displayRoute` on each child route. This
-  // should be complete and work as is.
+  // to call `displayRoute` on each child route.
   function displayChildren(children, dc_cb) {
     children.forEach(child => displayRoute(child));
     dc_cb(null, children);
   }
 
-  // Display a new (child) route (ID and length) in some way.
-  // We just appended this as an `<li>` to the `new-route-list`
-  // element in the HTML.
+  // Display a new (child) route (ID and length)
   function displayRoute(result) {
-    // FILL THIS IN
+    $('#new-route-list').text('');
+
+    console.log(result);
+    let routeId = result.routeId;
+    let length = result.len;
+    $('#new-route-list');
   }
 
-  // Display the best routes (length and IDs) in some way.
-  // We just appended each route's info as an `<li>` to
-  // the `best-route-list` element in the HTML.
+  // Display the best routes (length and IDs)
   //
   // MAKE SURE YOU END THIS with
   //
@@ -386,7 +439,9 @@
   // so the array of best routes is pass along through
   // the waterfall in `runGeneration`.
   function displayBestRoutes(bestRoutes, dbp_cb) {
-    // FILL THIS IN
+    $("#best-route-list").append(`<li>routeId: ${bestRoutes[0].routeId} with length: ${bestRoutes[0].len}</li>`);
+
+    dbp_cb(null, bestRoutes)
   }
 
   ////////////////////////////////////////////////////////////
@@ -398,9 +453,9 @@
   ////////////////////////////////////////////////////////////
 
   // The next few functions keep track of the best route we've seen
-  // so far. They should all be complete and not need any changes.
-
+  // so far.
   function updateBestRoute(children, ubr_cb) {
+
     children.forEach(child => {
       if (child.len < best.len) {
         updateBest(child.routeId);
@@ -414,8 +469,6 @@
   // Lambda, and then plot it if it's still the best. (Because of
   // asynchrony it's possible that it's no longer the best by the
   // time we get the details back from the Lambda.)
-  //
-  // This is complete and you shouldn't have to modify it.
   function updateBest(routeId) {
     getRouteById(routeId, processNewRoute);
 
@@ -433,6 +486,7 @@
         updateBest(routeId);
         return;
       }
+      
       if (best.len > route.len) {
         console.log(`Updating Best Route for ${routeId}`);
         best.routeId = routeId;
@@ -440,7 +494,7 @@
         best.bestPath = route.route;
         displayBestPath(); // Display the best route on the HTML page
         best.bestPath[route.route.length] = route.route[0]; // Loop Back
-        updateMapCoordinates(best.bestPath); 
+        updateMapCoordinates(best.bestPath);
         mapCurrentBestRoute();
       }
     }
@@ -455,8 +509,6 @@
   ////////////////////////////////////////////////////////////
 
   // The next few functions handle the mapping of the best route.
-  // This is all complete and you shouldn't have to change anything
-  // here.
 
   // Uses the data in the `best` global variable to draw the current
   // best route on the Leaflet map.
@@ -514,7 +566,6 @@
     L.geoJSON(cityData, layerProcessing).addTo(mymap);
 
     function onEachFeature(feature, layer) {
-      // does this feature have a property named popupContent?
       if (feature.properties && feature.properties.popupContent) {
         layer.bindPopup(feature.properties.popupContent);
       }
